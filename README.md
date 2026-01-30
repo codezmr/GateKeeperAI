@@ -14,7 +14,7 @@ Gatekeeper AI is a Java Spring Boot application that integrates with AI services
 ## Getting Started
 1. Clone the repository:
    ```bash
-   git clone <your-repo-url>
+   git clone (https://github.com/codezmr/GateKeeperAI.git)
    ```
 2. Build the project:
    ```bash
