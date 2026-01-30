@@ -1,11 +1,12 @@
 package com.gatekeeper.api.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import java.util.Map;
-import java.util.List;
 
 @Service
 public class ManualWatsonxService {
@@ -20,21 +21,28 @@ public class ManualWatsonxService {
     private String iamToken;
 
     private final RestClient restClient = RestClient.create();
+    private final ObjectMapper objectMapper = new ObjectMapper(); // For parsing JSON
 
     public String analyzeCode(String codeDiff) {
+        // Use the LEGACY endpoint because it is stable
         String url = baseUrl + "/ml/v1/text/generation?version=2023-05-29";
 
-        System.out.println("⚡ MANUAL OVERRIDE: Sending request to " + url);
+        System.out.println("⚡ GATEKEEPER: Sending code to IBM Granite 3.0...");
 
-        // Construct the exact JSON payload that worked in your Curl
         var requestBody = Map.of(
                 "project_id", projectId,
-                "model_id", "ibm/granite-3-8b-instruct",
+                "model_id", "ibm/granite-3-8b-instruct", // The working model
                 "input", """
-                     You are a Security Architect. Review this code for hardcoded secrets, PII logging, or SQL Injection.
-                     If safe, say 'SAFE'. If not, list the vulnerabilities.
+                     You are a strict Security Architect. 
+                     Review the following Java code for:
+                     1. Hardcoded Secrets
+                     2. PII Logging (passwords, tokens)
+                     3. SQL Injection
                      
-                     CODE TO REVIEW:
+                     If vulnerabilities are found, list them clearly with Severity levels.
+                     Then provide the FIXED code block.
+                     
+                     CODE:
                      """ + codeDiff,
                 "parameters", Map.of(
                         "decoding_method", "greedy",
@@ -44,8 +52,7 @@ public class ManualWatsonxService {
         );
 
         try {
-            // Send the POST request manually
-            String response = restClient.post()
+            String rawJson = restClient.post()
                     .uri(url)
                     .header("Authorization", "Bearer " + iamToken)
                     .contentType(MediaType.APPLICATION_JSON)
@@ -53,11 +60,16 @@ public class ManualWatsonxService {
                     .retrieve()
                     .body(String.class);
 
-            return "✅ RAW AI RESPONSE:\n" + response;
+            // --- CLEANING THE OUTPUT ---
+            // We extract only the "generated_text" field
+            JsonNode root = objectMapper.readTree(rawJson);
+            String cleanReport = root.path("results").get(0).path("generated_text").asText();
+
+            return "✅ ANALYSIS COMPLETE:\n" + cleanReport;
 
         } catch (Exception e) {
             e.printStackTrace();
-            return "❌ Manual Call Failed: " + e.getMessage();
+            return "❌ Analysis Failed: " + e.getMessage();
         }
     }
 }
