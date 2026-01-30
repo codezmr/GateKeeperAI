@@ -31,15 +31,23 @@ public class GateKeeperService {
 
     public String processPullRequest(Map<String, Object> payload) {
         try {
-            // 1. Extract Data
+            // 1. Extract Data safely
             Map<String, Object> pr = (Map<String, Object>) payload.get("pull_request");
+            if (pr == null) {
+                throw new IllegalArgumentException("Payload missing 'pull_request' object");
+            }
+
             String apiUrl = (String) pr.get("url");
 
+            // Safe Repository Name Extraction
             String repoName = "GateKeeper/Demo-Repo";
             if (payload.containsKey("repository") && payload.get("repository") != null) {
                 Map<String, Object> repo = (Map<String, Object>) payload.get("repository");
-                repoName = (String) repo.getOrDefault("full_name", repoName);
+                if (repo != null && repo.get("full_name") != null) {
+                    repoName = repo.get("full_name").toString();
+                }
             }
+
             String prNum = String.valueOf(pr.getOrDefault("number", "1"));
 
             sseService.broadcast("🔗 Fetching PR #" + prNum + " via API: " + apiUrl);
@@ -59,6 +67,7 @@ public class GateKeeperService {
             String analysis = watsonxService.analyzeCode(codeToAnalyze);
 
             // 4. Save Report
+            // We verify if the AI found actual vulnerabilities
             String status = analysis.toUpperCase().contains("VULNERABILITY REPORT") ? "VULNERABLE" : "SAFE";
             String cleanAnalysis = analysis.replace("✅ ANALYSIS COMPLETE:\n", "");
 
@@ -68,7 +77,7 @@ public class GateKeeperService {
                     prNum,
                     status,
                     cleanAnalysis,
-                    codeToAnalyze, // <--- SAVING THE DIFF HERE
+                    codeToAnalyze,
                     LocalDateTime.now()
             );
 
