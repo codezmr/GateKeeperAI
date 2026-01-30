@@ -59,7 +59,7 @@ public class GateKeeperService {
             String analysis = watsonxService.analyzeCode(codeToAnalyze);
 
             // 4. Save Report
-            String status = analysis.contains("SAFE") ? "SAFE" : "VULNERABLE";
+            String status = analysis.toUpperCase().contains("VULNERABILITY REPORT") ? "VULNERABLE" : "SAFE";
             String cleanAnalysis = analysis.replace("✅ ANALYSIS COMPLETE:\n", "");
 
             ScanReport report = new ScanReport(
@@ -68,11 +68,12 @@ public class GateKeeperService {
                     prNum,
                     status,
                     cleanAnalysis,
+                    codeToAnalyze, // <--- SAVING THE DIFF HERE
                     LocalDateTime.now()
             );
 
             scanHistory.add(0, report);
-            sseService.broadcast("✅ Report Generated for " + repoName);
+            sseService.broadcast("✅ Report Generated for " + repoName + " [" + status + "]");
 
             return analysis;
 
