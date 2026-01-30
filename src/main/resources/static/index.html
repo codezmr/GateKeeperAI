@@ -46,12 +46,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-diff.min.js"></script>
 
 <script type="text/babel">
     const { useState, useEffect, useRef } = React;
 
     // --- COMPONENT: Code Highlighter ---
-    // Parses the Markdown text and renders code blocks with Prism
     const SmartReport = ({ content }) => {
         const codeRef = useRef(null);
 
@@ -61,16 +61,14 @@
             }
         }, [content]);
 
-        // Split text by Markdown code blocks (```lang ... ```)
         const parts = content.split(/(```[\s\S]*?```)/g);
 
         return (
             <div ref={codeRef} className="text-slate-300 space-y-4">
                 {parts.map((part, index) => {
                     if (part.startsWith('```')) {
-                        // Extract language and code
                         const match = part.match(/```(\w+)?\n([\s\S]*?)```/);
-                        const lang = match && match[1] ? match[1] : 'java'; // Default to Java
+                        const lang = match && match[1] ? match[1] : 'java';
                         const code = match && match[2] ? match[2] : part.replace(/```/g, '');
 
                         return (
@@ -84,15 +82,12 @@
                             </div>
                         );
                     } else {
-                        // Regular text (Vulnerability descriptions)
                         return (
                             <div key={index} className="whitespace-pre-wrap leading-relaxed">
                                 {part.split('\n').map((line, i) => {
-                                    // 1. High Severity Header
                                     if (line.includes('Severity: HIGH')) {
                                         return <p key={i} className="text-red-400 font-bold mt-4 text-lg">{line.replace(/[*]/g, '')}</p>;
                                     }
-                                    // 2. Vulnerable Line (The new addition) - Highlighted in Amber
                                     if (line.includes('Vulnerable Line:')) {
                                         return (
                                             <div key={i} className="mt-1 ml-4 p-2 bg-amber-900/30 border-l-4 border-amber-500 rounded-r text-amber-200 font-mono text-sm">
@@ -100,19 +95,15 @@
                                             </div>
                                         );
                                     }
-                                    // 3. Explanation
                                     if (line.includes('Explanation:')) {
                                         return <p key={i} className="text-slate-400 text-sm mt-1 ml-4 italic">{line.replace(/\*\*/g, '').replace('📝', '').trim()}</p>;
                                     }
-                                    // 4. Section Headers
                                     if (line.includes('SUGGESTED FIX')) {
                                         return <h3 key={i} className="text-blue-400 font-bold text-xl mt-8 mb-2 border-b border-slate-700 pb-2">{line.replace(/#/g,'')}</h3>;
                                     }
                                     if (line.includes('VULNERABILITY REPORT')) {
                                         return <h3 key={i} className="text-red-400 font-bold text-xl mt-4 mb-2 border-b border-slate-700 pb-2">{line.replace(/#/g,'')}</h3>;
                                     }
-
-                                    // Default Text
                                     return <span key={i}>{line}{'\n'}</span>;
                                 })}
                             </div>
@@ -126,21 +117,20 @@
     function App() {
         const [reports, setReports] = useState([]);
         const [logs, setLogs] = useState([]);
+        // Track which report has its diff expanded
+        const [expandedDiffs, setExpandedDiffs] = useState({});
         const logsEndRef = useRef(null);
 
-        // Live Log Stream
         useEffect(() => {
             const eventSource = new EventSource('/api/stream');
             eventSource.onmessage = (event) => setLogs(prev => [...prev, event.data]);
             return () => eventSource.close();
         }, []);
 
-        // Auto-scroll logs
         useEffect(() => {
             if (logsEndRef.current) logsEndRef.current.scrollIntoView({ behavior: "smooth" });
         }, [logs]);
 
-        // Poll for Reports
         useEffect(() => {
             const fetchData = async () => {
                 try {
@@ -154,9 +144,14 @@
             return () => clearInterval(interval);
         }, []);
 
+        const toggleDiff = (id) => {
+            setExpandedDiffs(prev => ({ ...prev, [id]: !prev[id] }));
+            // Highlight syntax after render
+            setTimeout(() => window.Prism && window.Prism.highlightAll(), 100);
+        };
+
         return (
             <div className="min-h-screen p-8 max-w-6xl mx-auto">
-                {/* Header */}
                 <header className="flex justify-between items-center mb-8">
                     <div className="flex items-center gap-3">
                         <div className="bg-blue-600 p-2 rounded-lg shadow-lg shadow-blue-900/50">
@@ -178,7 +173,6 @@
                     </div>
                 </header>
 
-                {/* Live Terminal */}
                 <div className="mb-8">
                     <div className="flex items-center gap-2 mb-2 text-slate-400 text-sm">
                         <i data-lucide="terminal" className="w-4 h-4"></i>
@@ -196,7 +190,6 @@
                     </div>
                 </div>
 
-                {/* Report Cards */}
                 <div className="grid gap-8">
                     <h2 className="text-xl font-semibold text-white mb-2 flex items-center gap-2">
                         <i data-lucide="file-text" className="w-5 h-5"></i>
@@ -229,7 +222,25 @@
                                     </span>
                                 </div>
 
-                                {/* The Smart Code Renderer */}
+                                {/* --- NEW: Collapsible Diff Section --- */}
+                                <div className="mb-6">
+                                    <button
+                                        onClick={() => toggleDiff(report.id)}
+                                        className="text-slate-400 hover:text-white text-sm flex items-center gap-2 transition-colors focus:outline-none"
+                                    >
+                                        {expandedDiffs[report.id] ? <i data-lucide="chevron-down"></i> : <i data-lucide="chevron-right"></i>}
+                                        <span className="font-mono">View Original Diff</span>
+                                    </button>
+
+                                    {expandedDiffs[report.id] && (
+                                        <div className="mt-2 bg-slate-950 rounded-lg p-4 border border-slate-800 overflow-x-auto shadow-inner">
+                                            <pre className="language-diff text-sm text-slate-300">
+                                                <code>{report.rawDiff}</code>
+                                            </pre>
+                                        </div>
+                                    )}
+                                </div>
+
                                 <SmartReport content={report.aiAnalysis} />
 
                             </div>

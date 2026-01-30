@@ -27,17 +27,3 @@ If the code is safe, reply exactly: "✅ SAFE"
 If vulnerabilities are found, reply exactly in this structure:
 
 🚨 VULNERABILITY REPORT
-
-$$Severity: HIGH$$
-
- <Short Title>
-
-🔴 Vulnerable Line: <Copy the exact line of code causing the issue>
-
-📝 Explanation: <Brief explanation of why this is dangerous>
-
-🛠️ SUGGESTED FIX
-
-(Provide the COMPLETE, fixed Java method/class. Do not use git diffs (+/-). Write clean, production-ready code).
-
-// ... fixed code here ...
