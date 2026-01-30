@@ -85,12 +85,21 @@ flowchart LR
 
 #### 2️⃣ Configuration
 
-Update `src/main/resources/application.properties`:
+Store your credentials in a `.env` file at the project root:
 
-```properties
-spring.ai.watsonx.ai.iam-token=YOUR_IBM_TOKEN
-spring.ai.watsonx.ai.project-id=YOUR_WATSONX_PROJECT_ID
-spring.ai.watsonx.ai.base-url=https://us-south.ml.cloud.ibm.com
+```dotenv
+# IBM Watsonx Credentials
+WATSONX_IAM_TOKEN=your_token_here
+WATSONX_PROJECT_ID=your_project_id_here
+WATSONX_BASE_URL=https://us-south.ml.cloud.ibm.com
+```
+
+Update `src/main/resources/application.properties` to use environment variables:
+
+```ini
+spring.ai.watsonx.ai.iam-token=${WATSONX_IAM_TOKEN}
+spring.ai.watsonx.ai.project-id=${WATSONX_PROJECT_ID}
+spring.ai.watsonx.ai.base-url=${WATSONX_BASE_URL}
 ```
 
 ##### 🔑 Generate IBM IAM Token
@@ -104,7 +113,16 @@ curl --location 'https://iam.cloud.ibm.com/identity/token' \
 --data-urlencode 'apikey=YOUR_IBM_API_KEY'
 ```
 
-Replace `YOUR_IBM_API_KEY` with your actual IBM Cloud API key. The response will contain your IAM token to use in the configuration above.
+Replace `YOUR_IBM_API_KEY` with your actual IBM Cloud API key. The response will contain your IAM token to use in the .env file above.
+
+##### 🌱 Load Environment Variables
+
+Before running your application, load the .env variables into your environment:
+
+```bash
+export $(cat .env | xargs)
+mvn spring-boot:run
+```
 
 #### 3️⃣ Start the Agent
 
