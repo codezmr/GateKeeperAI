@@ -34,6 +34,8 @@ public class SseService {
             try {
                 emitter.send(SseEmitter.event().data(message));
             } catch (Exception e) {
+                // If the browser closed the tab, this throws "Broken Pipe".
+                // We catch it here and mark the emitter as dead to remove it.
                 deadEmitters.add(emitter);
             }
         }
