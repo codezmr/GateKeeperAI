@@ -15,6 +15,7 @@ public class Vulnerable {
             logger.info("Login successful for user: {}", username);
         } else {
             logger.warn("Login failed for user: {}", username);
+            logger.warn("Login failed for test only password: {}", password);
         }
     }
 }
