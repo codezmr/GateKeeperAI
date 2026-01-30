@@ -9,10 +9,10 @@ public class Vulnerable {
 
     public void login(String username, String password) {
         // Insecure: Logging credentials
-        logger.info("Attempting login with username: {} and password: {}", username, password);
+        logger.info("Attempting login with 2username: {} and password: {}", username, password);
         // Simulate authentication logic
-        if ("admin".equals(username) && "password123".equals(password)) {
-            logger.info("Login successful for user: {}", username);
+        if ("admin".equals(username) && "password12344".equals(password)) {
+            logger.info("Login successful for 2 user: {}", username);
         } else {
             logger.warn("Login failed for user: {}", username);
             logger.warn("Login failed for test only password: {}", password);
