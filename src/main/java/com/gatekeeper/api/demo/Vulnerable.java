@@ -18,7 +18,6 @@ public class Vulnerable {
 
         } catch (Exception e) {
             logger.error("Exception occurred while processing payment for card: {}", creditCardNumber, e);
-            e.printStackTrace();
         }
     }
 }
