@@ -10,7 +10,6 @@ import java.util.Random;
 public class Vulnerable {
 
     private static final Logger logger = LoggerFactory.getLogger(Vulnerable.class);
-    private static final String AWS_SECRET_KEY = "AKIA-1234567890-SECRET-KEY";
 
     public void processPayment(String userId, String creditCardNumber, String cvv, String password, String aadhaarNumber, String panCardNumber, Connection conn) {
         try {
