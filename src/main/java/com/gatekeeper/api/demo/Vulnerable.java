@@ -10,30 +10,25 @@ import java.util.Random;
 public class Vulnerable {
 
     private static final Logger logger = LoggerFactory.getLogger(Vulnerable.class);
-
-    // 1. HARDCODED SECRET (CWE-798)
     private static final String AWS_SECRET_KEY = "AKIA-1234567890-SECRET-KEY";
 
-    public void processPayment(String userId, String creditCardNumber, Connection conn) {
+    public void processPayment(String userId, String creditCardNumber, String cvv, String password, String aadhaarNumber, String panCardNumber, Connection conn) {
         try {
-            // 2. PII LEAKAGE (CWE-532)
-            logger.info("Processing payment for User: {} with Card: {}", userId, creditCardNumber);
-
-            // 3. INSECURE RANDOMNESS (CWE-330)
+            logger.info("Processing payment for User: {} with Card: {} and CVV: {} and Password: {}", userId, creditCardNumber, cvv, password);
+            logger.debug("Using AWS Secret Key: {}", AWS_SECRET_KEY);
+            logger.info("Full payment request: userId={}, card={}, cvv={}, password={}", userId, creditCardNumber, cvv, password);
+            logger.info("Aadhaar number: {}", aadhaarNumber);
+            logger.info("PAN card number: {}", panCardNumber);
             Random rand = new Random();
             int token = rand.nextInt();
-
-            // 4. INSECURE CRYPTOGRAPHY (CWE-327)
             MessageDigest md = MessageDigest.getInstance("MD5");
             byte[] hash = md.digest(creditCardNumber.getBytes());
-
-            // 5. SQL INJECTION (CWE-89)
-            String query = "SELECT * FROM transactions WHERE card_num = '" + creditCardNumber + "'";
+            String query = "SELECT * FROM transactions WHERE card_num = '" + creditCardNumber + "' AND cvv = '" + cvv + "' AND aadhaar = '" + aadhaarNumber + "' AND pan = '" + panCardNumber + "'";
             Statement stmt = conn.createStatement();
             stmt.execute(query);
-
+            logger.warn("Executed query: {}", query);
         } catch (Exception e) {
-            // 6. IMPROPER ERROR HANDLING (CWE-209)
+            logger.error("Exception occurred while processing payment for card: {}", creditCardNumber, e);
             e.printStackTrace();
         }
     }
