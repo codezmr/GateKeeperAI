@@ -10,7 +10,6 @@ import java.util.Random;
 public class Vulnerable {
 
     private static final Logger logger = LoggerFactory.getLogger(Vulnerable.class);
-
     public void processPayment(String userId, String creditCardNumber, String cvv, String password, String aadhaarNumber, String panCardNumber, Connection conn) {
         try {
             logger.info("Processing payment for User: {} with Card: {} and CVV: {} and Password: {}", userId, creditCardNumber, cvv, password);
