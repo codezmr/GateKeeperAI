@@ -1,151 +1,147 @@
-# 🛡️ GateKeeper AI
+# GateKeeper AI
 
-## 🔏 Automated Security Architect for Regulated Industries
+Automated security code review for regulated industries. GateKeeper AI integrates with your CI/CD pipeline to analyze pull requests in real time using IBM Watsonx, providing actionable security feedback and remediation suggestions.
 
----
+## Features
+- Context-aware vulnerability detection (e.g., log injection, SQLi, weak crypto)
+- Real-time security dashboard
+- Auto-remediation suggestions
+- GitHub webhook integration
 
-### 🚨 The Problem
+## Tech Stack
+- Java 21, Spring Boot 3.3
+- IBM Watsonx.ai (Granite 3-8b-instruct)
+- Maven
 
-- 🏦 In Fintech and Banking, **Security Compliance** is the biggest bottleneck.
-- ⏳ Developers wait days for manual security reviews.
-- ⚠️ Simple mistakes like logging a password or hardcoding a key block deployments.
-- 🧱 Security teams are overwhelmed and become the "Department of No."
+## Project Structure
 
----
-
-### 🤖 The Solution: GateKeeper AI
-
-GateKeeper is an **Autonomous AI Agent** that lives in your CI/CD pipeline.
-It acts as a Virtual Security Architect, reviewing every Pull Request in real-time using **IBM Watsonx (Granite 3.0)**.
-
-Unlike static tools (e.g., SonarQube) which just find syntax errors, GateKeeper understands context:
-
-- 🕵️‍♂️ Detects complex vulnerabilities (Log Injection, SQLi, Weak Crypto)
-- 📢 Explains why it is dangerous in plain English
-- 🛠️ Fixes the code automatically, providing a copy-paste solution
-
----
-
-### 🗂️ Technical Architecture
-
-```mermaid
-flowchart LR
-    User[👨‍💻 Developer] -- Pushes Code --> GitHub[🌐 GitHub Repo]
-    GitHub -- Webhook (📨 JSON) --> Controller[🖥️ Spring Boot Controller]
-    Controller -- Raw Diff --> Service[⚙️ GateKeeper Service]
-    Service -- Prompt + Code --> Watsonx[🧠 IBM Watsonx.ai]
-    Watsonx -- Security Report --> Service
-    Service -- Stream (🔗 SSE) --> Dashboard[📊 React Live Dashboard]
+```
+src/main/java/com/gatekeeper/api/
+├── GateKeeperApplication.java    # Main application entry point
+├── client/                       # External API clients
+│   ├── GitHubApiClient.java      # GitHub API integration
+│   └── WatsonxApiClient.java     # IBM Watsonx AI integration
+├── config/                       # Configuration classes
+│   ├── AppConfig.java            # Application configuration
+│   ├── GitHubProperties.java     # GitHub configuration properties
+│   └── WatsonxProperties.java    # Watsonx configuration properties
+├── constants/                    # Application constants
+│   └── GateKeeperConstants.java
+├── controller/                   # REST controllers
+│   └── WebhookController.java    # Webhook and API endpoints
+├── dto/                          # Data Transfer Objects
+│   ├── AnalysisResult.java
+│   ├── ApiResponse.java
+│   └── WebhookPayload.java
+├── exception/                    # Exception handling
+│   ├── AiAnalysisException.java
+│   ├── GitHubApiException.java
+│   └── GlobalExceptionHandler.java
+├── model/                        # Domain models
+│   └── ScanReport.java
+├── repository/                   # Data access layer
+│   ├── InMemoryScanReportRepository.java
+│   └── ScanReportRepository.java
+└── service/                      # Business logic services
+    ├── AIService.java
+    ├── GateKeeperService.java
+    └── SseService.java
 ```
 
----
+## Quick Start
 
-### 🧰 Tech Stack
+### 1. Configure Environment Variables (Recommended)
 
-- ☕ **Backend:** Java 21, Spring Boot 3.3
-- 🧠 **AI Engine:** IBM Watsonx.ai (Model: ibm/granite-3-8b-instruct)
-- 🔗 **Integration:** GitHub Webhooks + REST API
-- 🎨 **Frontend:** Server-Side React + Tailwind CSS (Zero-Build)
-- 📡 **Streaming:** Server-Sent Events (SSE) for real-time "Matrix Style" logs
-
----
-
-### 🔒 Key Features
-
-1. **🧠 Context-Aware Analysis**
-    - GateKeeper doesn't just regex for password. It understands variable naming and flow.
-    - ✅ Safe: `logger.info("User logged in")`
-    - ❌ Unsafe: `logger.info("User password: " + pass)` (CWE-532)
-
-2. **📊 Live Security Dashboard**
-    - A real-time, dark-mode dashboard that streams the agent's thought process and analysis results via SSE.
-
-3. **🛠️ Auto-Remediation**
-    - It doesn't just block you; it teaches you.
-    - **Before:**
-      ```java
-      String query = "SELECT * FROM users WHERE id = " + input;
-      ```
-    - **GateKeeper Fix:**
-      ```java
-      String query = "SELECT * FROM users WHERE id = ?";
-      PreparedStatement stmt = conn.prepareStatement(query);
-      stmt.setString(1, input);
-      ```
-
----
-
-### 🚦 How to Run
-
-#### 1️⃣ Prerequisites
-
-- ☕ Java 21
-- 🧰 Maven
-- ☁️ IBM Cloud Account (Watsonx.ai)
-
-#### 2️⃣ Configuration
-
-Store your credentials in a `.env` file at the project root:
-
-```dotenv
-# IBM Watsonx Credentials
-WATSONX_IAM_TOKEN=your_token_here
-WATSONX_PROJECT_ID=your_project_id_here
-WATSONX_BASE_URL=https://us-south.ml.cloud.ibm.com
-```
-
-Update `src/main/resources/application.properties` to use environment variables:
-
-```ini
-spring.ai.watsonx.ai.iam-token=${WATSONX_IAM_TOKEN}
-spring.ai.watsonx.ai.project-id=${WATSONX_PROJECT_ID}
-spring.ai.watsonx.ai.base-url=${WATSONX_BASE_URL}
-```
-
-##### 🔑 Generate IBM IAM Token
-
-Use the following curl command to generate your IBM IAM token:
+Set the following environment variables for production use:
 
 ```bash
-curl --location 'https://iam.cloud.ibm.com/identity/token' \
---header 'Content-Type: application/x-www-form-urlencoded' \
---data-urlencode 'grant_type=urn:ibm:params:oauth:grant-type:apikey' \
---data-urlencode 'apikey=YOUR_IBM_API_KEY'
+export WATSONX_BASE_URL=https://us-south.ml.cloud.ibm.com
+export WATSONX_PROJECT_ID=your-project-id
+export WATSONX_IAM_TOKEN=your-iam-token
+export WATSONX_MODEL_ID=ibm/granite-3-8b-instruct
+export GITHUB_TOKEN=your-github-token  # Optional, for private repos
 ```
 
-Replace `YOUR_IBM_API_KEY` with your actual IBM Cloud API key. The response will contain your IAM token to use in the .env file above.
+### 2. Or Configure via application.properties
 
-##### 🌱 Load Environment Variables
+Edit `src/main/resources/application.properties`:
 
-Before running your application, load the .env variables into your environment:
+```properties
+# IBM Watsonx Configuration
+gatekeeper.watsonx.base-url=https://us-south.ml.cloud.ibm.com
+gatekeeper.watsonx.project-id=YOUR_PROJECT_ID
+gatekeeper.watsonx.iam-token=YOUR_IAM_TOKEN
+gatekeeper.watsonx.model-id=ibm/granite-3-8b-instruct
 
-```bash
-export $(cat .env | xargs)
-mvn spring-boot:run
+# GitHub Configuration (optional)
+gatekeeper.github.token=YOUR_GITHUB_TOKEN
 ```
 
-#### 3️⃣ Start the Agent
+### 3. Run the Application
 
+**Using Maven:**
 ```bash
 mvn spring-boot:run
 ```
 
-#### 4️⃣ Trigger the Scan
+**Using specific profile:**
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
+```
 
-- 🌐 **Option A:** Configure a GitHub Webhook to `http://your-ngrok-url/api/webhook`.
-- 📝 **Option B (Manual):** Send a POST request to `http://localhost:8080/api/webhook` with a Pull Request payload.
+**In IntelliJ:** Open `GateKeeperApplication.java` and click Run.
 
-#### 5️⃣ View Dashboard
+Wait for: `🚀 GateKeeper AI is running and ready to analyze code!`
 
-Open [http://localhost:8080](http://localhost:8080) to watch the agent work live.
+### 4. Expose Localhost (for GitHub Webhooks)
+
+```bash
+ngrok http 8080
+```
+Copy the HTTPS URL provided by ngrok.
+
+### 5. Configure GitHub Webhook
+
+1. In your GitHub repo: **Settings → Webhooks → Add webhook**
+2. Payload URL: `https://<ngrok-id>.ngrok-free.app/api/webhook`
+3. Content type: `application/json`
+4. Events: Enable **"Pull requests"**
+
+### 6. View Dashboard
+
+Open [http://localhost:8080/index.html](http://localhost:8080/index.html) in your browser.
+
+### 7. Test
+
+Create or update a pull request in your repo. Watch the dashboard for live analysis and results.
+
+## API Endpoints
+
+| Method | Endpoint       | Description                    |
+|--------|----------------|--------------------------------|
+| GET    | `/api/history` | Get all scan history           |
+| GET    | `/api/stream`  | SSE endpoint for live logs     |
+| POST   | `/api/webhook` | GitHub webhook handler         |
+
+## Configuration Reference
+
+### Environment Variables
+
+| Variable              | Description                          | Default                                    |
+|-----------------------|--------------------------------------|--------------------------------------------|
+| `SERVER_PORT`         | Application server port              | 8080                                       |
+| `WATSONX_BASE_URL`    | IBM Watsonx API base URL             | https://us-south.ml.cloud.ibm.com          |
+| `WATSONX_PROJECT_ID`  | IBM Watsonx project ID               | -                                          |
+| `WATSONX_IAM_TOKEN`   | IBM Watsonx IAM token                | -                                          |
+| `WATSONX_MODEL_ID`    | AI model to use                      | ibm/granite-3-8b-instruct                  |
+| `WATSONX_MAX_TOKENS`  | Maximum tokens for AI response       | 500                                        |
+| `GITHUB_TOKEN`        | GitHub token for private repos       | -                                          |
+
+### Spring Profiles
+
+- `dev` - Development profile with verbose logging
+- `prod` - Production profile with minimal logging
 
 ---
 
-### 🏆 Hackathon Notes
-
-- 🧠 **Model:** Granite 3.0 8B Instruct for superior code-understanding capabilities compared to generic LLMs.
-- ⚙️ **Resilience:** Includes a "Simulation Mode" fallback if GitHub API limits are hit during the demo.
-
----
-
-*Built with integrity and innovation for IBM Dev Day*
+*Built for secure, efficient code review automation.*
