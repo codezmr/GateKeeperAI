@@ -1,95 +1,134 @@
 package com.gatekeeper.api.service;
 
+import com.gatekeeper.api.client.GitHubApiClient;
+import com.gatekeeper.api.client.WatsonxApiClient;
+import com.gatekeeper.api.dto.AnalysisResult;
+import com.gatekeeper.api.dto.WebhookPayload;
+import com.gatekeeper.api.exception.GitHubApiException;
 import com.gatekeeper.api.model.ScanReport;
+import com.gatekeeper.api.repository.ScanReportRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArrayList;
 
+/**
+ * Core business logic service for GateKeeper operations
+ */
 @Service
 public class GateKeeperService {
 
-    private final GitHubClient gitHubClient;
-    private final ManualWatsonxService watsonxService;
+    private static final Logger log = LoggerFactory.getLogger(GateKeeperService.class);
+
+    private final GitHubApiClient gitHubApiClient;
+    private final WatsonxApiClient watsonxApiClient;
     private final SseService sseService;
+    private final ScanReportRepository reportRepository;
 
-    // In-Memory Database
-    private final List<ScanReport> scanHistory = new CopyOnWriteArrayList<>();
-
-    public GateKeeperService(GitHubClient gitHubClient, ManualWatsonxService watsonxService, SseService sseService) {
-        this.gitHubClient = gitHubClient;
-        this.watsonxService = watsonxService;
+    public GateKeeperService(
+            GitHubApiClient gitHubApiClient,
+            WatsonxApiClient watsonxApiClient,
+            SseService sseService,
+            ScanReportRepository reportRepository
+    ) {
+        this.gitHubApiClient = gitHubApiClient;
+        this.watsonxApiClient = watsonxApiClient;
         this.sseService = sseService;
+        this.reportRepository = reportRepository;
     }
 
+    /**
+     * Retrieves all scan history
+     */
     public List<ScanReport> getHistory() {
-        return scanHistory;
+        return reportRepository.findAll();
     }
 
+    /**
+     * Processes a pull request webhook event
+     *
+     * @param payload the raw webhook payload
+     * @return the analysis result
+     */
     public String processPullRequest(Map<String, Object> payload) {
-        try {
-            // 1. Extract Data safely
-            Map<String, Object> pr = (Map<String, Object>) payload.get("pull_request");
-            if (pr == null) {
-                throw new IllegalArgumentException("Payload missing 'pull_request' object");
-            }
+        WebhookPayload webhookPayload = WebhookPayload.fromRawPayload(payload);
 
-            String apiUrl = (String) pr.get("url");
+        validatePayload(webhookPayload);
 
-            // Safe Repository Name Extraction
-            String repoName = "GateKeeper/Demo-Repo";
-            if (payload.containsKey("repository") && payload.get("repository") != null) {
-                Map<String, Object> repo = (Map<String, Object>) payload.get("repository");
-                if (repo != null && repo.get("full_name") != null) {
-                    repoName = repo.get("full_name").toString();
-                }
-            }
+        String prUrl = webhookPayload.getPrUrl();
+        String prNumber = webhookPayload.getPrNumber();
+        String repoName = webhookPayload.getRepositoryFullName();
 
-            String prNum = String.valueOf(pr.getOrDefault("number", "1"));
+        sseService.broadcast("🔗 Fetching PR #" + prNumber + " via API: " + prUrl);
 
-            sseService.broadcast("🔗 Fetching PR #" + prNum + " via API: " + apiUrl);
+        // Fetch code diff from GitHub
+        String codeToAnalyze = fetchCodeDiff(prUrl);
+        sseService.broadcast("📦 Successfully fetched Real Code (" + codeToAnalyze.length() + " chars)");
 
-            // 2. Fetch Code
-            String codeToAnalyze = gitHubClient.fetchDiff(apiUrl);
+        // Perform AI analysis
+        sseService.broadcast("🤖 Sending to IBM Watsonx (Granite 3.0)...");
+        AnalysisResult analysisResult = analyzeCode(codeToAnalyze);
 
-            if (codeToAnalyze == null || codeToAnalyze.isEmpty()) {
-                sseService.broadcast("❌ API Download Failed or Empty. Aborting scan.");
-                return "Error: Could not fetch diff from GitHub.";
-            }
+        // Save the report
+        ScanReport report = createAndSaveReport(repoName, prNumber, analysisResult);
+        sseService.broadcast("✅ Report Generated for " + repoName + " [" + report.status() + "]");
 
-            sseService.broadcast("📦 Successfully fetched Real Code (" + codeToAnalyze.length() + " chars)");
+        return formatAnalysisOutput(analysisResult);
+    }
 
-            // 3. AI Analysis
-            sseService.broadcast("🤖 Sending to IBM Watsonx (Granite 3.0)...");
-            String analysis = watsonxService.analyzeCode(codeToAnalyze);
-
-            // 4. Save Report
-            // We verify if the AI found actual vulnerabilities
-            String status = analysis.toUpperCase().contains("VULNERABILITY REPORT") ? "VULNERABLE" : "SAFE";
-            String cleanAnalysis = analysis.replace("✅ ANALYSIS COMPLETE:\n", "");
-
-            ScanReport report = new ScanReport(
-                    UUID.randomUUID().toString(),
-                    repoName,
-                    prNum,
-                    status,
-                    cleanAnalysis,
-                    codeToAnalyze,
-                    LocalDateTime.now()
-            );
-
-            scanHistory.add(0, report);
-            sseService.broadcast("✅ Report Generated for " + repoName + " [" + status + "]");
-
-            return analysis;
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            sseService.broadcast("❌ Processing Error: " + e.getMessage());
-            return "Error: " + e.getMessage();
+    private void validatePayload(WebhookPayload payload) {
+        if (payload.pullRequest() == null) {
+            throw new IllegalArgumentException("Payload missing 'pull_request' object");
         }
+        if (payload.getPrUrl() == null || payload.getPrUrl().isBlank()) {
+            throw new IllegalArgumentException("Pull request URL is missing");
+        }
+    }
+
+    private String fetchCodeDiff(String prUrl) {
+        String codeDiff = gitHubApiClient.fetchDiff(prUrl);
+
+        if (codeDiff == null || codeDiff.isEmpty()) {
+            sseService.broadcast("❌ API Download Failed or Empty. Aborting scan.");
+            throw new GitHubApiException("Could not fetch diff from GitHub - empty response");
+        }
+
+        return codeDiff;
+    }
+
+    private AnalysisResult analyzeCode(String codeDiff) {
+        String analysis = watsonxApiClient.analyzeCode(codeDiff);
+        String cleanAnalysis = analysis.replace("✅ ANALYSIS COMPLETE:\n", "");
+
+        String status = analysis.toUpperCase().contains("VULNERABILITY REPORT")
+                ? AnalysisResult.STATUS_VULNERABLE
+                : AnalysisResult.STATUS_SAFE;
+
+        return new AnalysisResult(status, cleanAnalysis, codeDiff);
+    }
+
+    private ScanReport createAndSaveReport(String repoName, String prNumber, AnalysisResult result) {
+        ScanReport report = new ScanReport(
+                UUID.randomUUID().toString(),
+                repoName,
+                prNumber,
+                result.status(),
+                result.analysis(),
+                result.rawDiff(),
+                LocalDateTime.now()
+        );
+
+        reportRepository.save(report);
+        log.info("Saved scan report for {} PR#{} - Status: {}", repoName, prNumber, result.status());
+
+        return report;
+    }
+
+    private String formatAnalysisOutput(AnalysisResult result) {
+        return "✅ ANALYSIS COMPLETE:\n" + result.analysis();
     }
 }
